@@ -24,8 +24,8 @@ app.use(cors({
 
 app.use(express.json());
 
-// Serve static files from the frontend build
-app.use(express.static(path.join(__dirname, '../../opti-crm/dist')));
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, '../public')));
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
@@ -217,7 +217,7 @@ app.use('/api/customers', customerRoutes);
 
 // Handle SPA routing - must be after API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../../opti-crm/dist/index.html'));
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 server.listen(port, () => {
