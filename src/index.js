@@ -3,21 +3,29 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { WebSocketServer } from 'ws';
 import http from 'http';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import customerRoutes from './routes/customers.js';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 const port = process.env.PORT || 3000;
 
-// Enable CORS for your frontend domain
+// Enable CORS for development
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*'
 }));
 
 app.use(express.json());
+
+// Serve static files from the frontend build
+app.use(express.static(path.join(__dirname, '../../opti-crm/dist')));
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
@@ -35,12 +43,11 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'connection', status: 'connected' }));
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// API Routes
+app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Dashboard data endpoint
 app.get('/api/dashboard', async (req, res) => {
   try {
     res.json({
@@ -107,7 +114,6 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-// Leads endpoints
 app.get('/api/leads', (req, res) => {
   res.json([
     {
@@ -209,7 +215,11 @@ app.get('/api/analytics', (req, res) => {
 // Mount the customer routes
 app.use('/api/customers', customerRoutes);
 
-// Important: Listen with the http server instead of app
-server.listen(port, '0.0.0.0', () => {
+// Handle SPA routing - must be after API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../opti-crm/dist/index.html'));
+});
+
+server.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
