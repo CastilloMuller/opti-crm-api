@@ -14,7 +14,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
+const wss = new WebSocketServer({ 
+  server,
+  path: '/ws',
+  clientTracking: true
+});
+
 const port = process.env.PORT || 3000;
 
 // Enable CORS for development
@@ -28,24 +33,70 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
 // WebSocket connection handling
-wss.on('connection', (ws) => {
-  console.log('Client connected');
+wss.on('connection', (ws, req) => {
+  console.log('Client connected from:', req.socket.remoteAddress);
+  
+  // Send initial connection status
+  ws.send(JSON.stringify({ 
+    type: 'connection', 
+    status: 'connected',
+    timestamp: new Date().toISOString()
+  }));
+  
+  // Set up ping-pong to keep connection alive
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
   
   ws.on('message', (message) => {
-    console.log('received: %s', message);
+    try {
+      const data = JSON.parse(message);
+      console.log('received:', data);
+      
+      // Echo back the message
+      ws.send(JSON.stringify({
+        type: 'echo',
+        data,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.error('Error processing message:', error);
+    }
   });
   
   ws.on('close', () => {
     console.log('Client disconnected');
+    ws.isAlive = false;
   });
   
-  // Send initial connection status
-  ws.send(JSON.stringify({ type: 'connection', status: 'connected' }));
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+    ws.isAlive = false;
+  });
+});
+
+// Set up interval to check for stale connections
+const interval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', () => {
+  clearInterval(interval);
 });
 
 // API Routes
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ 
+    status: 'ok',
+    connections: wss.clients.size
+  });
 });
 
 app.get('/api/dashboard', async (req, res) => {
