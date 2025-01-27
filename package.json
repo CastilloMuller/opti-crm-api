@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "build": "echo 'No build step required'"
+    "dev": "nodemon src/index.js"
   },
   "engines": {
     "node": ">=18.0.0"

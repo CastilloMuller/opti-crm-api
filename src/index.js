@@ -7,8 +7,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-// Force port 3000 for Render
-const PORT = 3000;
+
+// Use Render's PORT environment variable
+const port = process.env.PORT || 3000;
 
 // In-memory data store
 const leads = [];
@@ -215,16 +216,16 @@ app.use((err, req, res, next) => {
 
 // Create HTTP server
 console.log('Starting server with configuration:');
-console.log('- PORT:', PORT);
-console.log('- NODE_ENV:', process.env.NODE_ENV);
-console.log('- Current directory:', process.cwd());
+console.log(`- PORT: ${port}`);
+console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`- Current directory: ${process.cwd()}`);
 
-server.listen(PORT, '0.0.0.0', (error) => {
+server.listen(port, '0.0.0.0', (error) => {
   if (error) {
-    console.error('Error starting server:', error);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check available at http://0.0.0.0:${PORT}/health`);
-  console.log(`WebSocket server is running`);
+  console.log(`Server is running at http://0.0.0.0:${port}`);
+  console.log(`Health check endpoint: http://0.0.0.0:${port}/health`);
+  console.log('WebSocket server is running');
 });
