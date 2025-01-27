@@ -200,7 +200,7 @@ app.get('/api/leads/:leadId/activities', (req, res) => {
   res.json(activities);
 });
 
-// Start server
-server.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// Listen on 0.0.0.0 instead of localhost
+server.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on port ${port}`);
 });
