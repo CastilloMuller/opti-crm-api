@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "PORT=10000 node src/index.js",
     "dev": "nodemon src/index.js",
     "build": "echo 'No build step required'"
   },

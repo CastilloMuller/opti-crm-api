@@ -213,8 +213,16 @@ app.use((err, req, res, next) => {
 });
 
 // Create HTTP server
-server.listen(port, '0.0.0.0', () => {
+console.log('Attempting to start server on port:', port);
+
+server.listen(port, '0.0.0.0', (error) => {
+  if (error) {
+    console.error('Error starting server:', error);
+    process.exit(1);
+  }
   console.log(`Server is running on port ${port}`);
   console.log(`Health check available at http://0.0.0.0:${port}/health`);
   console.log(`WebSocket server is running`);
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Current working directory:', process.cwd());
 });
