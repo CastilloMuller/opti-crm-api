@@ -50,36 +50,12 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// WebSocket setup
-const server = createServer(app);
-const wss = new WebSocketServer({ server });
-
-wss.on('connection', (ws) => {
-  console.log('Client connected');
-  
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      broadcastUpdate(data.type);
-    } catch (error) {
-      console.error('WebSocket message error:', error);
-    }
-  });
-  
-  ws.on('close', () => {
-    console.log('Client disconnected');
-  });
+// Basic health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-function broadcastUpdate(type) {
-  const message = JSON.stringify({ type, timestamp: new Date() });
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
-  });
-}
 
 // API Routes
 
@@ -200,7 +176,45 @@ app.get('/api/leads/:leadId/activities', (req, res) => {
   res.json(activities);
 });
 
-// Listen on 0.0.0.0 instead of localhost
+// WebSocket setup
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+  console.log('Client connected');
+  
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+      broadcastUpdate(data.type);
+    } catch (error) {
+      console.error('WebSocket message error:', error);
+    }
+  });
+  
+  ws.on('close', () => {
+    console.log('Client disconnected');
+  });
+});
+
+function broadcastUpdate(type) {
+  const message = JSON.stringify({ type, timestamp: new Date() });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+// Create HTTP server
 server.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on port ${port}`);
+  console.log(`Health check available at http://0.0.0.0:${port}/health`);
+  console.log(`WebSocket server is running`);
 });
