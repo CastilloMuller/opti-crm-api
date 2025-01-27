@@ -41,9 +41,9 @@ tasks.push({
   completed: false
 });
 
-// Configure CORS
+// Configure CORS to allow all Render domains in development
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'https://opti-crm-frontend.onrender.com',
+  origin: ['https://opti-crm.onrender.com', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -53,6 +53,19 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'OptiCRM API is running',
+    endpoints: {
+      health: '/health',
+      dashboard: '/api/dashboard/stats',
+      leads: '/api/leads',
+      tasks: '/api/tasks'
+    }
+  });
+});
 
 // Basic health check endpoint
 app.get('/health', (req, res) => {
