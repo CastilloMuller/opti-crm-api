@@ -1,322 +1,203 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { WebSocketServer } from 'ws';
-import http from 'http';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import customerRoutes from './routes/customers.js';
+import { createServer } from 'http';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ 
-  server,
-  path: '/ws',
-  clientTracking: true
-});
-
 const port = process.env.PORT || 3000;
 
-// Enable CORS for development
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*'
-}));
+// In-memory data store
+const leads = [];
+const tasks = [];
+let nextLeadId = 1;
+let nextTaskId = 1;
 
+// Sample data
+leads.push({
+  id: nextLeadId++,
+  name: "John Doe",
+  email: "john@example.com",
+  phone: "+31612345678",
+  status: "Hot",
+  decisionDate: "2024-02-15",
+  quotationValue: 25000,
+  outstandingTasks: 2,
+  notes: "Interested in solar panels for their new home"
+});
+
+tasks.push({
+  id: nextTaskId++,
+  title: "Follow-up call",
+  type: "Bellen",
+  scheduledDate: "2024-01-28T10:00:00",
+  description: "Discuss quotation details",
+  leadId: 1,
+  leadName: "John Doe",
+  completed: false
+});
+
+// Configure CORS
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'https://opti-crm-frontend.onrender.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
+// Middleware
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// Serve static files from the public directory
-app.use(express.static(path.join(__dirname, '../public')));
+// WebSocket setup
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
 
-// WebSocket connection handling
-wss.on('connection', (ws, req) => {
-  console.log('Client connected from:', req.socket.remoteAddress);
-  
-  // Send initial connection status
-  ws.send(JSON.stringify({ 
-    type: 'connection', 
-    status: 'connected',
-    timestamp: new Date().toISOString()
-  }));
-  
-  // Set up ping-pong to keep connection alive
-  ws.isAlive = true;
-  ws.on('pong', () => {
-    ws.isAlive = true;
-  });
+wss.on('connection', (ws) => {
+  console.log('Client connected');
   
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
-      console.log('received:', data);
-      
-      // Echo back the message
-      ws.send(JSON.stringify({
-        type: 'echo',
-        data,
-        timestamp: new Date().toISOString()
-      }));
+      broadcastUpdate(data.type);
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('WebSocket message error:', error);
     }
   });
   
   ws.on('close', () => {
     console.log('Client disconnected');
-    ws.isAlive = false;
-  });
-  
-  ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
-    ws.isAlive = false;
   });
 });
 
-// Set up interval to check for stale connections
-const interval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) {
-      return ws.terminate();
+function broadcastUpdate(type) {
+  const message = JSON.stringify({ type, timestamp: new Date() });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
     }
-    ws.isAlive = false;
-    ws.ping();
   });
-}, 30000);
-
-wss.on('close', () => {
-  clearInterval(interval);
-});
+}
 
 // API Routes
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    connections: wss.clients.size
-  });
+
+// Dashboard stats
+app.get('/api/dashboard/stats', (req, res) => {
+  const stats = {
+    totalLeads: leads.length,
+    activeLeads: leads.filter(l => l.status !== 'Niets mee doen').length,
+    tasksToday: tasks.filter(t => {
+      const today = new Date();
+      const taskDate = new Date(t.scheduledDate);
+      return taskDate.toDateString() === today.toDateString();
+    }).length,
+    totalQuotationValue: leads.reduce((sum, lead) => sum + (lead.quotationValue || 0), 0),
+    upcomingDecisions: leads.filter(l => new Date(l.decisionDate) > new Date()).length
+  };
+  res.json(stats);
 });
 
-app.get('/api/dashboard', async (req, res) => {
-  try {
-    const response = {
-      stats: {
-        total: 150,
-        active: 75,
-        converted: 45,
-        conversionRate: '30.0%',
-        value: 250000
-      },
-      recentLeads: [
-        {
-          id: 1,
-          name: "John Smith",
-          company: "Tech Solutions Inc",
-          status: "active",
-          value: 25000,
-          lastContact: "2025-01-25"
-        },
-        {
-          id: 2,
-          name: "Sarah Johnson",
-          company: "Digital Dynamics",
-          status: "new",
-          value: 15000,
-          lastContact: "2025-01-24"
-        },
-        {
-          id: 3,
-          name: "Michael Brown",
-          company: "Innovation Labs",
-          status: "converted",
-          value: 50000,
-          lastContact: "2025-01-23"
-        }
-      ],
-      recentActivity: [
-        {
-          id: 1,
-          type: "call",
-          description: "Follow-up call with John Smith",
-          date: "2025-01-25T14:30:00Z"
-        },
-        {
-          id: 2,
-          type: "email",
-          description: "Sent proposal to Sarah Johnson",
-          date: "2025-01-24T16:45:00Z"
-        },
-        {
-          id: 3,
-          type: "meeting",
-          description: "Contract signed with Michael Brown",
-          date: "2025-01-23T11:00:00Z"
-        }
-      ]
-    };
-
-    res.json(response);
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message 
-    });
-  }
-});
-
+// Leads
 app.get('/api/leads', (req, res) => {
-  res.json([
-    {
-      id: 1,
-      name: "John Smith",
-      company: "Tech Solutions Inc",
-      email: "john@techsolutions.com",
-      phone: "+1 555-0123",
-      status: "active",
-      value: 25000,
-      lastContact: "2025-01-25",
-      notes: "Interested in enterprise solution"
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      company: "Digital Dynamics",
-      email: "sarah@digitaldynamics.com",
-      phone: "+1 555-0124",
-      status: "new",
-      value: 15000,
-      lastContact: "2025-01-24",
-      notes: "Requesting product demo"
-    },
-    {
-      id: 3,
-      name: "Michael Brown",
-      company: "Innovation Labs",
-      email: "michael@innovationlabs.com",
-      phone: "+1 555-0125",
-      status: "converted",
-      value: 50000,
-      lastContact: "2025-01-23",
-      notes: "Contract signed"
-    }
-  ]);
+  res.json(leads);
 });
 
 app.get('/api/leads/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const leads = [
-    {
-      id: 1,
-      name: "John Smith",
-      company: "Tech Solutions Inc",
-      email: "john@techsolutions.com",
-      phone: "+1 555-0123",
-      status: "active",
-      value: 25000,
-      lastContact: "2025-01-25",
-      notes: "Interested in enterprise solution"
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      company: "Digital Dynamics",
-      email: "sarah@digitaldynamics.com",
-      phone: "+1 555-0124",
-      status: "new",
-      value: 15000,
-      lastContact: "2025-01-24",
-      notes: "Requesting product demo"
-    },
-    {
-      id: 3,
-      name: "Michael Brown",
-      company: "Innovation Labs",
-      email: "michael@innovationlabs.com",
-      phone: "+1 555-0125",
-      status: "converted",
-      value: 50000,
-      lastContact: "2025-01-23",
-      notes: "Contract signed"
-    }
-  ];
-  
-  const lead = leads.find(l => l.id === id);
-  if (lead) {
-    res.json(lead);
-  } else {
-    res.status(404).json({ error: 'Lead not found' });
+  const lead = leads.find(l => l.id === parseInt(req.params.id));
+  if (!lead) {
+    return res.status(404).json({ error: 'Lead not found' });
   }
+  res.json(lead);
 });
 
-app.get('/api/calendar', (req, res) => {
-  res.json([
-    {
-      id: 1,
-      title: "Follow-up call with John Smith",
-      start: "2025-01-27T14:30:00",
-      end: "2025-01-27T15:30:00",
-      type: "call",
-      leadId: 1
-    },
-    {
-      id: 2,
-      title: "Product demo for Sarah Johnson",
-      start: "2025-01-28T10:00:00",
-      end: "2025-01-28T11:30:00",
-      type: "meeting",
-      leadId: 2
-    },
-    {
-      id: 3,
-      title: "Contract review with Michael Brown",
-      start: "2025-01-29T15:00:00",
-      end: "2025-01-29T16:00:00",
-      type: "meeting",
-      leadId: 3
+app.post('/api/leads', (req, res) => {
+  const lead = {
+    id: nextLeadId++,
+    ...req.body,
+    outstandingTasks: 0
+  };
+  leads.push(lead);
+  broadcastUpdate('lead_created');
+  res.status(201).json(lead);
+});
+
+app.put('/api/leads/:id', (req, res) => {
+  const index = leads.findIndex(l => l.id === parseInt(req.params.id));
+  if (index === -1) {
+    return res.status(404).json({ error: 'Lead not found' });
+  }
+  leads[index] = { ...leads[index], ...req.body };
+  broadcastUpdate('lead_updated');
+  res.json(leads[index]);
+});
+
+// Tasks
+app.get('/api/tasks', (req, res) => {
+  res.json(tasks);
+});
+
+app.get('/api/leads/:leadId/tasks', (req, res) => {
+  const leadTasks = tasks.filter(t => t.leadId === parseInt(req.params.leadId));
+  res.json(leadTasks);
+});
+
+app.post('/api/tasks', (req, res) => {
+  const task = {
+    id: nextTaskId++,
+    ...req.body,
+    completed: false
+  };
+  
+  // Update lead's outstanding tasks count
+  const lead = leads.find(l => l.id === task.leadId);
+  if (lead) {
+    lead.outstandingTasks++;
+  }
+  
+  tasks.push(task);
+  broadcastUpdate('task_created');
+  res.status(201).json(task);
+});
+
+app.put('/api/tasks/:id', (req, res) => {
+  const index = tasks.findIndex(t => t.id === parseInt(req.params.id));
+  if (index === -1) {
+    return res.status(404).json({ error: 'Task not found' });
+  }
+  
+  const wasCompleted = tasks[index].completed;
+  const willBeCompleted = req.body.completed;
+  
+  tasks[index] = { ...tasks[index], ...req.body };
+  
+  // Update lead's outstanding tasks count if completion status changed
+  if (!wasCompleted && willBeCompleted) {
+    const lead = leads.find(l => l.id === tasks[index].leadId);
+    if (lead && lead.outstandingTasks > 0) {
+      lead.outstandingTasks--;
     }
-  ]);
-});
-
-app.get('/api/analytics', (req, res) => {
-  res.json({
-    leadsByStatus: {
-      new: 25,
-      active: 75,
-      converted: 45,
-      lost: 5
-    },
-    conversionTrend: [
-      { month: "Jan", value: 28 },
-      { month: "Feb", value: 32 },
-      { month: "Mar", value: 35 },
-      { month: "Apr", value: 30 },
-      { month: "May", value: 38 },
-      { month: "Jun", value: 42 }
-    ],
-    valueByStage: {
-      Prospecting: 150000,
-      Qualification: 200000,
-      Proposal: 300000,
-      Negotiation: 250000,
-      Closed: 500000
-    },
-    activityMetrics: {
-      calls: 45,
-      emails: 120,
-      meetings: 25
+  } else if (wasCompleted && !willBeCompleted) {
+    const lead = leads.find(l => l.id === tasks[index].leadId);
+    if (lead) {
+      lead.outstandingTasks++;
     }
-  });
+  }
+  
+  broadcastUpdate('task_updated');
+  res.json(tasks[index]);
 });
 
-// Mount the customer routes
-app.use('/api/customers', customerRoutes);
-
-// Serve index.html for all other routes (SPA support)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+// Activities
+app.get('/api/leads/:leadId/activities', (req, res) => {
+  const leadTasks = tasks.filter(t => t.leadId === parseInt(req.params.leadId));
+  const activities = leadTasks.map(task => ({
+    type: task.type,
+    date: task.scheduledDate,
+    description: task.title
+  }));
+  res.json(activities);
 });
 
 // Start server
