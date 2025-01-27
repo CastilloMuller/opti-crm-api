@@ -7,7 +7,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+// Force port 3000 for Render
+const PORT = 3000;
 
 // In-memory data store
 const leads = [];
@@ -213,7 +214,6 @@ app.use((err, req, res, next) => {
 });
 
 // Create HTTP server
-const PORT = process.env.PORT || 3000;
 console.log('Starting server with configuration:');
 console.log('- PORT:', PORT);
 console.log('- NODE_ENV:', process.env.NODE_ENV);
