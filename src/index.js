@@ -101,20 +101,30 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/dashboard', async (req, res) => {
   try {
-    res.json({
+    // Get total leads count
+    const totalLeads = 150;
+    const activeLeads = 75;
+    const convertedLeads = 45;
+    const totalValue = 250000;
+
+    // Calculate conversion rate
+    const conversionRate = ((convertedLeads / totalLeads) * 100).toFixed(1) + '%';
+
+    // Prepare response
+    const response = {
       stats: {
-        totalLeads: 150,
-        activeLeads: 75,
-        convertedLeads: 45,
-        conversionRate: "30%",
-        totalValue: 250000
+        total: totalLeads,
+        active: activeLeads,
+        converted: convertedLeads,
+        conversionRate,
+        value: totalValue
       },
       recentLeads: [
         {
           id: 1,
           name: "John Smith",
           company: "Tech Solutions Inc",
-          status: "Active",
+          status: "active",
           value: 25000,
           lastContact: "2025-01-25"
         },
@@ -122,7 +132,7 @@ app.get('/api/dashboard', async (req, res) => {
           id: 2,
           name: "Sarah Johnson",
           company: "Digital Dynamics",
-          status: "New",
+          status: "new",
           value: 15000,
           lastContact: "2025-01-24"
         },
@@ -130,7 +140,7 @@ app.get('/api/dashboard', async (req, res) => {
           id: 3,
           name: "Michael Brown",
           company: "Innovation Labs",
-          status: "Converted",
+          status: "converted",
           value: 50000,
           lastContact: "2025-01-23"
         }
@@ -139,29 +149,31 @@ app.get('/api/dashboard', async (req, res) => {
         {
           id: 1,
           type: "call",
-          leadName: "John Smith",
-          description: "Follow-up call scheduled",
-          date: "2025-01-25T14:30:00"
+          description: "Follow-up call with John Smith",
+          date: "2025-01-25T14:30:00Z"
         },
         {
           id: 2,
           type: "email",
-          leadName: "Sarah Johnson",
-          description: "Proposal sent",
-          date: "2025-01-24T16:45:00"
+          description: "Sent proposal to Sarah Johnson",
+          date: "2025-01-24T16:45:00Z"
         },
         {
           id: 3,
           type: "meeting",
-          leadName: "Michael Brown",
-          description: "Contract signed",
-          date: "2025-01-23T11:00:00"
+          description: "Contract signed with Michael Brown",
+          date: "2025-01-23T11:00:00Z"
         }
       ]
-    });
+    };
+
+    res.json(response);
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
   }
 });
 
